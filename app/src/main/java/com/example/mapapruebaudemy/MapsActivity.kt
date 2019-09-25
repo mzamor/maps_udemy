@@ -107,11 +107,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarker
             location:LatLng? ->
             markersList?.add(mMap.addMarker(MarkerOptions().position(location!!).title("location with longClick")))
             markersList?.last()!!.isDraggable = true
-            val coords = LatLng(markersList?.last()!!.position.latitude,markersList?.last()!!.position.longitude)
-            val origin = "origin=" + myPosition?.latitude.toString() + "," + myPosition?.longitude.toString() + "&"
-            val destination = "destination=" + coords.latitude.toString() + "," + coords.longitude.toString()  +"&"
-            val parameters = origin + destination + "sensor=false&mode=driving"
-            loadURL("http://maps.googleapis.com/maps/api/directions/json?" + parameters)
+      //      val coords = LatLng(markersList?.last()!!.position.latitude,markersList?.last()!!.position.longitude)
+      //      val origin = "origin=" + myPosition?.latitude.toString() + "," + myPosition?.longitude.toString() + "&"
+      //      val destination = "destination=" + coords.latitude.toString() + "," + coords.longitude.toString()  +"&"
+      //      val parameters = origin + destination + "sensor=false&mode=driving"
+      //      loadURL("http://maps.googleapis.com/maps/api/directions/json?" + parameters)
         }
     }
     override fun onMarkerClick(marker: Marker?): Boolean {
