@@ -1,11 +1,17 @@
 package com.example.mapapruebaudemy
 
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
+import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -15,24 +21,23 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.*
 import com.google.android.gms.tasks.OnSuccessListener
 import javax.security.auth.callback.Callback
 
-class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarkerClickListener {
+class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarkerClickListener , GoogleMap.OnMarkerDragListener{
     private lateinit var mMap: GoogleMap
     private val coarseLocationPermission = android.Manifest.permission.ACCESS_COARSE_LOCATION
     private val fineLocationPermission = android.Manifest.permission.ACCESS_FINE_LOCATION
     private val QUERY_PERMISSION_CODE = 100
-    var fusedLocationProviderClient : FusedLocationProviderClient? = null
-    var locationRequest : LocationRequest? = null
-    var callback:LocationCallback?=null
-    var markGolden:Marker? = null
-    var markPisa:Marker? = null
-    var markPiramide:Marker? = null
+    private var fusedLocationProviderClient : FusedLocationProviderClient? = null
+    private var locationRequest : LocationRequest? = null
+    private var callback:LocationCallback?=null
+    private var markGolden:Marker? = null
+    private var markPisa:Marker? = null
+    private  var markPiramide:Marker? = null
+    private var markersList : ArrayList<Marker>? = null
+    private var myPosition : LatLng? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,8 +55,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarker
                     mMap.uiSettings.isMyLocationButtonEnabled =true
                     for(location in locationResult?.locations!!){
                         Toast.makeText(applicationContext,location.latitude.toString() + " , " + location.longitude.toString(), Toast.LENGTH_SHORT).show()
-                        val myPosition = LatLng(location.latitude, location.longitude)
-                        mMap.addMarker(MarkerOptions().position(myPosition).title("Home"))
+                        myPosition = LatLng(location.latitude, location.longitude)
+                        mMap.addMarker(MarkerOptions().position(myPosition!!).title("Home"))
                       //  mMap.moveCamera(CameraUpdateFactory.newLatLng(myPosition))
                     }
                 }
@@ -66,6 +71,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarker
         }else{
             askForLocationPermission()
         }
+        staticMarkers()
+        createListeners()
+        prepareMarkers()
+        drawCircleArea()
+    }
+
+    private fun createListeners(){
+        mMap.setOnMarkerClickListener(this)
+        mMap.setOnMarkerDragListener(this)
+    }
+    private fun staticMarkers(){
         val TORRE_PISA = LatLng(43.7229, 10.3965)
         val GOLDEN_STATE = LatLng(37.8199, -122.478)
         val PIRAMIDES = LatLng(29.9772, 31.1324)
@@ -78,9 +94,26 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarker
         markPiramide= mMap.addMarker(MarkerOptions().position(PIRAMIDES).title("Piramides de Egipto")
             .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_MAGENTA)))
         markPiramide?.tag = 0
-        mMap.setOnMarkerClickListener(this)
     }
 
+    private fun drawCircleArea(){
+            var coordinates = CircleOptions().center(LatLng(43.7229, 10.3965)).radius(2000.0).strokeColor(Color.BLACK).strokeWidth(10f)
+            mMap.addCircle(coordinates)
+    }
+
+    private fun prepareMarkers() {
+        markersList = ArrayList()
+        mMap.setOnMapLongClickListener {
+            location:LatLng? ->
+            markersList?.add(mMap.addMarker(MarkerOptions().position(location!!).title("location with longClick")))
+            markersList?.last()!!.isDraggable = true
+            val coords = LatLng(markersList?.last()!!.position.latitude,markersList?.last()!!.position.longitude)
+            val origin = "origin=" + myPosition?.latitude.toString() + "," + myPosition?.longitude.toString() + "&"
+            val destination = "destination=" + coords.latitude.toString() + "," + coords.longitude.toString()  +"&"
+            val parameters = origin + destination + "sensor=false&mode=driving"
+            loadURL("http://maps.googleapis.com/maps/api/directions/json?" + parameters)
+        }
+    }
     override fun onMarkerClick(marker: Marker?): Boolean {
         var clickNumber = marker?.tag as? Int
         if(clickNumber!=null){
@@ -89,6 +122,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarker
             Toast.makeText(applicationContext,"cantidad de clicks ${clickNumber}",Toast.LENGTH_LONG).show()
         }
         return false
+    }
+
+    override fun onMarkerDragEnd(marker: Marker?) {
+    }
+
+    override fun onMarkerDragStart(marker: Marker?) {
+    }
+
+    override fun onMarkerDrag(marker: Marker?) {
     }
 
     private fun initLocationRequest(){
@@ -147,10 +189,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback, GoogleMap.OnMarker
         fusedLocationProviderClient?.requestLocationUpdates(locationRequest,callback,null)
     }
 
-
     private fun stopUpdateLocation(){
         fusedLocationProviderClient?.removeLocationUpdates(callback)
     }
+
+    private fun loadURL(url:String){
+        val queue = Volley.newRequestQueue(this)
+        val query = StringRequest(Request.Method.GET,url, Response.Listener<String>
+        {
+            response ->
+            Log.d("HTTP",response)
+        },Response.ErrorListener {})
+        queue.add(query)
+    }
+
     override fun onStart() {
         super.onStart()
         if(isLocationPermissionValidated()){
